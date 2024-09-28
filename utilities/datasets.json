@@ -1,0 +1,17 @@
+{
+  "wifi": {
+    "path": "/home/mohamed_chaaben/PycharmProjects/MyDiffusion/real_data.csv",
+    "sep": ",",
+    "drop_cols": ["a"],
+    "data_types": [
+      ["device_label", "categorical"],
+      ["length", "positive int"],
+      ["IE 45", "positive int"],
+      ["IE 127", "positive int"],
+      ["IE 221", "positive int"],
+      ["IE 45*", "categorical"],
+      ["IE 127*", "categorical"],
+      ["IE 221*", "categorical"]
+    ]
+  }
+}
