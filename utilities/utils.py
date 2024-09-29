@@ -22,15 +22,11 @@ from table_evaluator import TableEvaluator
 
 
 def save_parameters(study: Study, file_path: str = 'parameters.txt'):
+    # Save the best parameters found by Optuna
     with open(file_path, 'a') as file:
         for key, value in study.best_params.items():
             file.write(f"{key}: {value}\n")
     print(f"Parameters are saved to {file_path}")
-
-
-def configure_mlflow():
-    dotenv.load_dotenv()
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_URI"))
 
 
 def configure_directories():

@@ -1,6 +1,5 @@
 {
-  "wifi": {
-    "path": "/home/mohamed_chaaben/PycharmProjects/MyDiffusion/real_data.csv",
+    "path": "original_data.csv",
     "sep": ",",
     "drop_cols": ["a"],
     "data_types": [
@@ -13,5 +12,4 @@
       ["IE 127*", "categorical"],
       ["IE 221*", "categorical"]
     ]
-  }
 }

@@ -9,7 +9,7 @@ from .architectures import Generator
 from sklearn.preprocessing import OneHotEncoder, QuantileTransformer
 from torch import nn
 from torch.autograd import Variable
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from utilities.utils import gather_object_params
 
 # Ignore warnings
@@ -69,6 +69,7 @@ class TableDiffusion:
             mlflow_logging=True,
             cuda=True,
     ):
+        self.data_n = None
         self.data_dim = None
         self.encoded_columns = None
         self.total_categories = None
@@ -99,11 +100,13 @@ class TableDiffusion:
             _param_dict = gather_object_params(self, prefix="init.")
             mlflow.log_params(_param_dict)
 
-        self._elapsed_batches = 0
-        self._elapsed_epochs = 0
+        self.elapsed_batches = 0
+        self.elapsed_epochs = 0
 
-    def fit(self, df, n_epochs=10, discrete_columns=[], verbose=True):
+    def fit(self, df, n_epochs=10, discrete_columns=None, verbose=False):
 
+        if discrete_columns is None:
+            discrete_columns = []
         global categorical_start_idx, loss
         self.data_dim = df.shape[1]
         self.data_n = df.shape[0]
@@ -142,7 +145,7 @@ class TableDiffusion:
         self.data_n = df_encoded.shape[0]
 
         train_data = DataLoader(
-            torch.from_numpy(df_encoded.values.astype(np.float32)).to(self.device),
+            TensorDataset(torch.from_numpy(df_encoded.values.astype(np.float32))),
             batch_size=self.batch_size,
             drop_last=False,
         )
@@ -172,8 +175,9 @@ class TableDiffusion:
         self.model.train()
 
         for epoch in range(n_epochs):
-            self._elapsed_epochs += 1
+            self.elapsed_epochs += 1
             for i, X in enumerate(train_data):
+                X = X[0] # Because a DataLoader returns a tuple
                 if i > 2 and loss.isnan():
                     print("Loss is NaN. Early stopping.")
                     return self
@@ -181,7 +185,7 @@ class TableDiffusion:
                 if self.sample_img_interval is not None and i % self.sample_img_interval == 0:
                     fig, axs = plt.subplots(self.diffusion_steps, 5, figsize=(4 * self.diffusion_steps, 4 * 5))
 
-                self._elapsed_batches += 1
+                self.elapsed_batches += 1
 
                 real_X = Variable(X.type(Tensor))
                 agg_loss = torch.Tensor([0]).to(self.device)
@@ -244,7 +248,7 @@ class TableDiffusion:
                     agg_loss += loss
 
                 loss = agg_loss / self.diffusion_steps
-                print(f"Batches: {self._elapsed_batches}, {agg_loss=}")
+                #print(f"Batches: {self.elapsed_batches}, {agg_loss=}")
 
                 self.optim.zero_grad()
                 loss.backward()
@@ -252,13 +256,13 @@ class TableDiffusion:
 
                 if self.sample_img_interval is not None and i % self.sample_img_interval == 0:
                     plt.savefig(
-                        f"../results/diffusion_figs/{self._now}_forward_T{self.diffusion_steps}_B{self._elapsed_batches}.png")
+                        f"../results/diffusion_figs/{self._now}_forward_T{self.diffusion_steps}_B{self.elapsed_batches}.png")
                     sample = self.sample(n=X.shape[0], post_process=False)
                     plt.cla()
                     plt.clf()
                     plt.imshow(sample)
                     plt.savefig(
-                        f"../results/diffusion_figs/{self._now}_sample_T{self.diffusion_steps}_B{self._elapsed_batches}.png")
+                        f"../results/diffusion_figs/{self._now}_sample_T{self.diffusion_steps}_B{self.elapsed_batches}.png")
 
                 if i % 20 == 0:
                     if verbose:
@@ -268,13 +272,13 @@ class TableDiffusion:
                     if self.mlflow_logging:
                         mlflow.log_metrics(
                             {
-                                "elapsed_batches": self._elapsed_batches,
-                                "elapsed_epochs": self._elapsed_epochs,
+                                "elapsed_batches": self.elapsed_batches,
+                                "elapsed_epochs": self.elapsed_epochs,
                                 "train_loss.numerical": numeric_loss.item(),
                                 "train_loss.categorical": categorical_loss.item(),
                                 "train_loss.total": loss.item(),
                             },
-                            step=self._elapsed_epochs,
+                            step=self.elapsed_epochs,
                         )
 
                         # _norm_dict = calc_norm_dict(self.model)
@@ -292,7 +296,7 @@ class TableDiffusion:
             for t in range(self.diffusion_steps - 1, -1, -1):
                 beta_t = get_beta(t, self.diffusion_steps)
                 noise_scale = np.sqrt(beta_t)
-                print(f"Sampling {t=}, {np.sqrt(beta_t)=}")
+                #print(f"Sampling {t=}, {np.sqrt(beta_t)=}")
                 #ax = axs[self.diffusion_steps - t - 1]
                 #ax[2].imshow(samples.clone().detach().cpu().numpy())
                 #ax[2].set_title(f"samples_{t}")
@@ -313,7 +317,7 @@ class TableDiffusion:
 
         if self.sample_img_interval is not None:
             plt.savefig(
-                f"../results/diffusion_figs/{self._now}_reverse_T{self.diffusion_steps}_B{self._elapsed_batches}.png")
+                f"../results/diffusion_figs/{self._now}_reverse_T{self.diffusion_steps}_B{self.elapsed_batches}.png")
 
         synthetic_data = samples.detach().cpu().numpy()
         self.model.train()

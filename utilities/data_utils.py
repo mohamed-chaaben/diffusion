@@ -6,38 +6,31 @@ import pandas as pd
 from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
 
 with open('utilities/datasets.json', 'r') as file:
-    datasets = json.load(file)
+    dataset = json.load(file)
 
 
-def load_and_prep_data(dataset="uci_adult", datadir="../data", verbose=False):
-    """Loads the specified dataset. Returns X, X_tx, processor"""
-
-    if dataset not in datasets.keys():
-        raise ValueError(f"'{dataset}' is not a valid dataset.")
-
+def load_and_prep_data(datadir, verbose=False):
+    """Loads the dataset. Returns X, X_tx, processor"""
     datadir = Path(datadir)
     if not os.path.exists(datadir):
         raise ValueError(f"'{datadir}' not found.")
 
-    # load parameters for specified dataset
-    data_params = datasets[dataset]
-
     # Load the dataset
-    path = Path(datadir) / data_params["path"]
-    X = pd.read_csv(path, sep=data_params["sep"]).drop(data_params["drop_cols"], axis=1)
+    path = Path(datadir) / dataset["path"]
+    X = pd.read_csv(path, sep=dataset["sep"]).drop(dataset["drop_cols"], axis=1)
     if verbose:
-        print(f"Loaded {dataset} dataset {X.shape} from {path}")
+        print(f"Loaded dataset with shape {X.shape} from {path}")
 
     # Transform dataset
     if verbose:
         print("Transforming dataset...")
-    processor = DataProcessor(data_params["data_types"]).fit(X)
+    processor = DataProcessor(dataset["data_types"]).fit(X)
     X_tx = processor.transform(X.values)
     if verbose:
         print(f"Data is now {X_tx.shape}")
 
     # Transform the pandas columns into the correct data types
-    for col, dtype in data_params["data_types"]:
+    for col, dtype in dataset["data_types"]:
         if dtype == "categorical":
             X[col] = X[col].astype("object")
         elif dtype == "numerical":
