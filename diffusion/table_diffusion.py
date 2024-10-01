@@ -96,9 +96,9 @@ class TableDiffusion:
 
         # Logging to MLflow
         self.mlflow_logging = mlflow_logging
-        if self.mlflow_logging:
-            _param_dict = gather_object_params(self, prefix="init.")
-            mlflow.log_params(_param_dict)
+        # if self.mlflow_logging:
+        #     _param_dict = gather_object_params(self, prefix="init.")
+        #     mlflow.log_params(_param_dict)
 
         self.elapsed_batches = 0
         self.elapsed_epochs = 0
