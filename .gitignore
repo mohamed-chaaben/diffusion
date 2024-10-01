@@ -2,5 +2,5 @@
 /data/output_data/
 /mlruns/
 parameters.txt
-utilities/__pycache__/
-diffusion/__pycache__/
+/utilities/__pycache__/
+/diffusion/__pycache__/

@@ -24,7 +24,7 @@ from table_evaluator import TableEvaluator
 def save_parameters(study: Study, file_path: str = 'parameters.txt'):
     # Save the best parameters found by Optuna
     with open(file_path, 'a') as file:
-        file.write(f"Trial_{study.best_trial.number}")
+        file.write(f"Trial {study.best_trial.number}\n")
         for key, value in study.best_params.items():
             file.write(f"{key}: {value}\n")
     print(f"Parameters are saved to {file_path}")

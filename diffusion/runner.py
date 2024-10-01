@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from pathlib import Path
 import mlflow
@@ -42,7 +43,7 @@ def log_mlflow(run_name, exp_id, repeat, repeats, _seed, metaseed, _seeds, X_sha
 
 
 def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epochs: int = 4,
-        diffusion_steps: int = 3, repeats=3, with_benchmark=False, ctgan_epochs=30, metaseed=42, save_gen_data=True,
+        diffusion_steps: int = 3, repeats=1, with_benchmark=False, ctgan_epochs=30, metaseed=42, save_gen_data=False,
         experiment_id=None):
     # Settings
     assert experiment_id is not None, "Experiment ID must be provided."
@@ -64,6 +65,11 @@ def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epoc
             generated_data_path = Path('data/output_data') / experiment_id
             generated_data_path.mkdir(parents=True, exist_ok=True)
 
+            log_mlflow(run_name=run_name, exp_id=experiment_id, repeat=repeat, repeats=repeats, _seed=_seed,
+                       metaseed=metaseed, _seeds=_seeds, X_shape=X.shape, _X_shape=_X.shape,
+                       discrete_cols=discrete_cols,
+                       raw_data=raw_data, cuda=cuda)
+
             if with_benchmark:
                 print("Benchmarking with CTGAN...")
                 ctgan = CTGAN(epochs=ctgan_epochs, cuda=cuda)
@@ -73,10 +79,12 @@ def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epoc
                 pd.DataFrame(X_gen_benchmark).to_csv(Path(generated_data_path) / f"CTGAN_gen_{run_name}.csv",
                                                      index=False)
 
-            log_mlflow(run_name=run_name, exp_id=experiment_id, repeat=repeat, repeats=repeats, _seed=_seed,
-                       metaseed=metaseed, _seeds=_seeds, X_shape=X.shape, _X_shape=_X.shape,
-                       discrete_cols=discrete_cols,
-                       raw_data=raw_data, cuda=cuda)
+                gan_evaluator = TableEvaluator(X, X_gen_benchmark, cat_cols=discrete_cols, verbose=True)
+                mlflow.log_figure(gan_evaluator.plot_mean_std(), "gan_Log_mea_std.png")
+                mlflow.log_figure(gan_evaluator.plot_cumsums(), "gan_cumsum.png")
+                mlflow.log_figure(gan_evaluator.plot_distributions(), "gan_dist.png")
+                mlflow.log_figure(gan_evaluator.plot_pca(), "gan_pca.png")
+                mlflow.log_figure(gan_evaluator.plot_correlation_difference(), "gan_corr_difference.png")
 
             print("Training model...")
 
@@ -89,7 +97,6 @@ def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epoc
                     model = model.fit(_X.copy(), discrete_columns=discrete_cols, n_epochs=epochs)
 
                 mlflow.log_metrics({"elapsed_batches": model.elapsed_batches}, step=model.elapsed_batches)
-
                 print("Generating data...")
                 X_fake = pd.DataFrame(model.sample(_X.shape[0]))
                 if not raw_data:
@@ -97,12 +104,11 @@ def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epoc
                     X_fake = pd.DataFrame(processor.inverse_transform(X_fake.values), columns=X.columns)
 
                 evaluator = TableEvaluator(X, X_fake, cat_cols=discrete_cols, verbose=True)
-                score = evaluator.column_correlations()
 
                 # For the validation, we need to costumize the data types
                 data_types = [
                     ('device_label', 'categorical'),
-                    ('length', 'int'),
+                    ('length', 'float'),
                     ('IE 45', 'float'),
                     ('IE 127', 'float'),
                     ('IE 221', 'float'),
@@ -110,8 +116,8 @@ def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epoc
                     ('IE 127*', 'categorical'),
                     ('IE 221*', 'categorical')]
 
-                marginal_distance = compute_marginal_distances(X, X_fake, data_types)
-                mlflow.log_metrics({f"{key.replace('*', '_')}md": value for key, value in marginal_distance.items()})
+                marginal_distances = compute_marginal_distances(X, X_fake, data_types)
+                mlflow.log_metrics({f"{key.replace('*', '_')}md": value for key, value in marginal_distances.items()})
 
                 mlflow.log_figure(evaluator.plot_mean_std(), "Log_mea_std.png")
                 mlflow.log_figure(evaluator.plot_cumsums(), "cumsum.png")
@@ -119,7 +125,8 @@ def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epoc
                 mlflow.log_figure(evaluator.plot_pca(), "pca.png")
                 mlflow.log_figure(evaluator.plot_correlation_difference(), "corr_difference.png")
 
-                mlflow.log_metric("score", score)
+                for idx, value in marginal_distances.items():
+                    mlflow.log_metric(re.sub(r'[^a-zA-Z0-9_\-\. /]', '_', f"marginal_distance_{idx}"), value)
 
                 # Log samples and stats for fake data to MLflow
                 pd.set_option("display.max_columns", 200)
@@ -134,7 +141,7 @@ def run(raw_data=True, cuda=True, batch_size: int = 1024, lr: float = 5e-4, epoc
                         / f"genData_{run_name}_{repeat}.csv",
                         index=False,
                     )
-                scores.append(score)
+                scores.append(sum(marginal_distances.values) / 8)
 
             except Exception as e:
                 mlflow.set_tag("error", f"{e}\t{e.args}")

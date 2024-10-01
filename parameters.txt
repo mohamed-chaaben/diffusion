@@ -1,4 +1,12 @@
-batch_size: 139
-lr: 0.0014390872792190421
-epochs: 10
-diffusion_steps: 3
+Trial 349
+batch_size: 294
+lr: 1.0003140902584375e-05
+epochs: 14
+diffusion_steps: 6
+
+Trial 371
+batch_size: 29
+lr: 0.08435855580656354
+epochs: 14
+diffusion_steps: 2
+

@@ -47,12 +47,13 @@ def objective(trial):
         epochs = trial.suggest_int("epochs", 3, 16)
         diffusion_steps = trial.suggest_int("diffusion_steps", 2, 6)
 
+        mlflow.log_params(trial.params)
         score = run(experiment_id=experiment_id, batch_size=batch_size, lr=lr, epochs=epochs,
-                    diffusion_steps=diffusion_steps)
+                    diffusion_steps=diffusion_steps, with_benchmark=True)
 
         return score
 
 
-study = optuna.create_study(study_name="Wi-Fi-study", direction="maximize")
-study.optimize(objective, n_trials=50, show_progress_bar=True)
+study = optuna.create_study(study_name="Wi-Fi-study", direction="minimize")
+study.optimize(objective, n_trials=500, show_progress_bar=True)
 save_parameters(study=study)

@@ -13,8 +13,6 @@ from sklearn.neighbors import NearestNeighbors
 def _get_frequencies(real, synthetic):
     """Get percentual frequencies for each possible real categorical value.
 
-    Based on https://github.com/sdv-dev/SDMetrics/blob/926bc8c276a7fc9dbc700d8f4a26947300343c7e/sdmetrics/utils.py#L40
-
     Given two iterators containing categorical data, this transforms it into
     observed/expected frequencies which can be used for statistical tests. It
     adds a regularization term to handle cases where the synthetic data contains
@@ -37,7 +35,6 @@ def _get_frequencies(real, synthetic):
 
 
 def compute_marginal_distances(real_dataset: pd.DataFrame, fake_dataset: pd.DataFrame, data_types):
-    # TODO docstring
     scores = {}
     for _, (col, var_type) in enumerate(data_types):
         if "categorical" in var_type or "int" in var_type:
@@ -60,9 +57,7 @@ def compute_marginal_distances(real_dataset: pd.DataFrame, fake_dataset: pd.Data
             warnings.warn(f"'{col}' is not a recognised type ({var_type}), ignoring...")
 
         scores[col] = result
-    print(pd.Series(scores))
     return pd.Series(scores)
-    #return scores
 
 
 def pmse_ratio(data, synthetic_data):
@@ -156,9 +151,6 @@ def wasserstein_randomization(d1_large, d2_large, iters=10, downsample_size=100)
     :return: wasserstein randomization mean
     :rtype: float
     """
-    # pip install pyemd
-    # https://github.com/wmayner/pyemd
-
     assert len(d1_large) == len(d2_large)
     d1 = d1_large.sample(n=downsample_size)
     d2 = d2_large.sample(n=downsample_size)
@@ -168,19 +160,8 @@ def wasserstein_randomization(d1_large, d2_large, iters=10, downsample_size=100)
     for _ in range(iters):
         np.random.shuffle(d3)
         n_1, n_2 = d3[:l_1], d3[l_1:]
-        # TODO: Readdress the constraints of PyEMD
-        # For now, decrease bin size drastically for
-        # more efficient computation
-        # try:
-        #     # PyEMD is sometimes memory intensive
-        #     # Let's reduce bins if so
-        #     dist = emd_samples(n_1, n_2, bins='auto')
-        # except MemoryError:
         dist = emd_samples(n_1, n_2, bins=10)
         distances.append(dist)
-
-    # Safety check, to see if there are any valid
-    # measurements
     return np.mean(np.array(distances)) if distances else -1
 
 
@@ -223,7 +204,7 @@ def alpha_beta_auth(df_X, df_X_syn, emb_center=None):
     nbrs_synth = NearestNeighbors(n_neighbors=1, n_jobs=-1, p=2).fit(X_syn)
     real_to_synth, real_to_synth_args = nbrs_synth.kneighbors(X)
 
-    # Let us find closest real point to any real point, excluding itself (therefore 1 instead of 0)
+    # Let us find the closest real point to any real point, excluding itself (therefore 1 instead of 0)
     real_to_real = real_to_real[:, 1].squeeze()
     real_to_synth = real_to_synth.squeeze()
     real_to_synth_args = real_to_synth_args.squeeze()
@@ -245,7 +226,6 @@ def alpha_beta_auth(df_X, df_X_syn, emb_center=None):
         beta_coverage_curve.append(beta_coverage)
 
     # See which one is bigger
-
     authen = real_to_real[real_to_synth_args] < real_to_synth
     authenticity = np.mean(authen)
 
